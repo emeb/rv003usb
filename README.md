@@ -22,17 +22,19 @@ It shows both how to be a normal USB device, as well as how to write programs to
 
 The reason why D+/D- is "flipped" here verses `usb_config.h` is because for USB low-speed, the D+/D- lines are swapped. It is frustratingly unintuitive.
 
-As-written you **cannot** use PD6,7 or PC6,7 in any combination with the USB stack.  You must use other pins.
+As-written you **cannot** use PD6,7 or PC6,7 in any combination with the USB stack.  You must use other pins.  Sorry, let me know if you find a way.
 
  * `U1` is a CH32V003
  * `J1` is a USB type C connector.
- * `R1` 1.5k 5% is required under all configurations, though it may connect D- to DPU or VCC if the intent is for the part to always be on-bus.
+ * `R1` 1.5k 5% is required under all configurations, though it may connect† D- to DPU or VCC if the intent is for the part to always be on-bus.
  * `U2`, `C1`, `C2` are used to run the CH32V003 at 3.3V.  For USB it should not be run beyond 3.6V.
  * `R2`, `R3` 5.1k resistors are only needed if using a type C connector.  If using a USB C host the host will not provide power without these.
 
 It even supports the SOIC-8 - see this thread: https://github.com/cnlohr/rv003usb/issues/25#issuecomment-1779130408
 
 Optionally 33 or 47 ohm resistors may be placed in-series with D+ and D- to the port to reduce noise and help protect the chip.
+
+† If you initialize bus resets by holding the pins low, it is strongly recommended to add the afore mentioned resistors.
 
 ### It's got demos!
 
@@ -51,7 +53,7 @@ And the following largely incomplete, but proof-of-concept projects:
 | ------------ | ----------- | --------------- | ------------- |
 | [cdc_exp](https://github.com/cnlohr/rv003usb/tree/master/testing/cdc_exp) | Enumerate as a USB Serial port and send and receive Data (incomplete, very simple) | `⚠️` | `✅` | :question: |
 | [demo_midi](https://github.com/cnlohr/rv003usb/tree/master/testing/demo_midi) | MIDI-IN and MIDI-OUT | `✅` | `✅` |
-| [test_ethernet](https://github.com/cnlohr/rv003usb/tree/master/testing/test_ethernet) | RNDIS Device | `⛔` | `✅` |
+| [test_ethernet](https://github.com/cnlohr/rv003usb/tree/master/testing/test_ethernet) | RNDIS Device (note: VERY SLOW) | `⚠️` | `✅` |
 
 Note: CDC In windows likely CAN work, but I can't figure out how to do it.  Linux explicitly blacklists all low-speed USB Ethernet that I could find.  The MIDI example only demonstrates MIDI-OUT.
 
