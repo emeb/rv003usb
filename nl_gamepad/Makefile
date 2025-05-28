@@ -1,6 +1,6 @@
 all : flash
 
-TARGET:=hidapi_bubble
+TARGET:=nl_gamepad
 TARGET_MCU:=CH32V003
 CH32V003FUN:=../ch32v003fun/ch32fun
 MINICHLINK?=../ch32v003fun/minichlink

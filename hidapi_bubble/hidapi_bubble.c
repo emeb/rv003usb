@@ -4,7 +4,7 @@
  * 12-12-23 E. Brombaugh
  */
  
-#include "ch32v003fun.h"
+#include "ch32fun.h"
 #include <stdio.h>
 #include <string.h>
 #include "rv003usb.h"
