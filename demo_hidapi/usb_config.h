@@ -4,10 +4,10 @@
 //Defines the number of endpoints for this device. (Always add one for EP0). For two EPs, this should be 3.
 #define ENDPOINTS 2
 
-#define USB_DM 3
-#define USB_DP 4
-#define USB_DPU 5
-#define USB_PORT D
+#define USB_PORT D     // [A,C,D] GPIO Port to use with D+, D- and DPU
+#define USB_PIN_DP 3   // [0-4] GPIO Number for USB D+ Pin
+#define USB_PIN_DM 4   // [0-4] GPIO Number for USB D- Pin
+#define USB_PIN_DPU 5  // [0-7] GPIO for feeding the 1.5k Pull-Up on USB D- Pin; Comment out if not used / tied to 3V3!
 
 #define RV003USB_DEBUG_TIMING      0
 #define RV003USB_OPTIMIZE_FLASH    1
@@ -72,7 +72,7 @@ static const uint8_t config_descriptor[] = {
 	0x80,					// bmAttributes (was 0xa0)
 	0x64,					// bMaxPower (200mA)
 
-	//Joystick  (It is unusual that this would be here)
+	//class FF device
 	9,					// bLength
 	4,					// bDescriptorType
 	0,		            // bInterfaceNumber  = 1 instead of 0 -- well make it second.

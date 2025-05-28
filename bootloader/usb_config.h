@@ -4,10 +4,23 @@
 //Defines the number of endpoints for this device. (Always add one for EP0). For two EPs, this should be 3.  For one, 2.
 #define ENDPOINTS 2
 
-#define USB_DM 3
-#define USB_DP 4
-#define USB_DPU 5
-#define USB_PORT D
+/*	
+	CH32V003FUN DevBoard:
+	PD3 D+
+	PD4 D-
+	PD5 D-_PU
+
+	CH32V003J4M6:
+	PC1 D+
+	PC2 D-
+	PC4 D-_PU
+*/
+
+#define USB_PORT D     // [A,C,D] GPIO Port to use with D+, D- and DPU
+#define USB_PIN_DP 3   // [0-4] GPIO Number for USB D+ Pin
+#define USB_PIN_DM 4   // [0-4] GPIO Number for USB D- Pin
+//#define USB_PORT_DPU A  // [A,C,D] Override GPIO Port for DPU
+#define USB_PIN_DPU 5  // [0-7] GPIO for feeding the 1.5k Pull-Up on USB D- Pin; Comment out if not used / tied to 3V3!
 
 #define RV003USB_OPTIMIZE_FLASH 1
 
@@ -39,10 +52,11 @@ static const uint8_t special_hid_desc[] = {
   HID_USAGE_PAGE ( HID_USAGE_PAGE_DESKTOP      )                 ,
   HID_USAGE      ( 0xff  )                 , // Needed?
   HID_COLLECTION ( HID_COLLECTION_APPLICATION )                 ,
+    HID_REPORT_SIZE ( 8 ),
+    HID_REPORT_COUNT ( 127 ) ,
     HID_REPORT_ID    ( 0xaa                                   )
     HID_USAGE        ( 0xff              ) ,
     HID_FEATURE      ( HID_DATA | HID_ARRAY | HID_ABSOLUTE    ) ,
-    HID_REPORT_COUNT ( 128 ) ,
   HID_COLLECTION_END
 };
 
@@ -69,7 +83,7 @@ static const uint8_t config_descriptor[] = {  //Mostly stolen from a USB mouse I
 	0,					// bAlternateSetting
 	1,					// bNumEndpoints
 	0x03,					// bInterfaceClass (0x03 = HID)
-	0xff,					// bInterfaceSubClass
+	0x00,					// bInterfaceSubClass
 	0xff,					// bInterfaceProtocol
 	0,					// iInterface
 
@@ -85,7 +99,7 @@ static const uint8_t config_descriptor[] = {  //Mostly stolen from a USB mouse I
 	0x05, //Endpoint Descriptor (Must be 5)
 	0x81, //Endpoint Address
 	0x03, //Attributes
-	0x40,	0x00, //Size
+	0x08,	0x00, //Size
 	0xff, //Interval
 };
 

@@ -1,6 +1,6 @@
 // Test
 
-#include "ch32v003fun.h"
+#include "ch32fun.h"
 #include "rv003usb.h"
 
 #define CFGLR_OFFSET 0
@@ -13,7 +13,7 @@
 
 #define SYSTICK_CNT 0xE000F008
 
-// This is 6 * n + 3 cylces
+// This is 6 * n + 3 cycles
 #define nx6p3delay( n, freereg ) li freereg, ((n)+1); 1: c.addi freereg, -1; c.bnez freereg, 1b
 
 //See RV003USB_DEBUG_TIMING note in .c file.
@@ -23,12 +23,11 @@
 #define	RESTORE_DEBUG_MARKER(x) lw	x4, x(sp)
 #define SAVE_DEBUG_MARKER(x)	sw	x4, x(sp)
 #else
-#define DEBUG_TICK_SETUP la x4, (TIM1_BASE + 0x44) 	// for debug (Go nowhere)
+#define DEBUG_TICK_SETUP la x4, (TIM1_BASE + 0x58) 	// for debug (Go nowhere)
 #define DEBUG_TICK_MARK .balign 4; sw x0, 0(x4)
 #define	RESTORE_DEBUG_MARKER(x) lw	x4, x(sp)
 #define SAVE_DEBUG_MARKER(x)	sw	x4, x(sp)
 #endif
-
 
 .global test_memory
 .global rv003usb_internal_data
@@ -46,6 +45,7 @@ Compressed:
 
 .section .text.vector_handler
 .global EXTI7_0_IRQHandler
+
 .balign 4
 EXTI7_0_IRQHandler:
 	addi	sp,sp,-80
@@ -60,6 +60,13 @@ EXTI7_0_IRQHandler:
 	sw	a3, 12(sp)
 	sw	a4, 16(sp)
 	sw	s1, 28(sp)
+
+#if defined (RV003_ADD_EXTI_MASK) && defined (RV003_ADD_EXTI_HANDLER)
+	la a1, 0x40010414 //	R32_EXTI_INTFR
+	c.lw a2, 0(a1)
+	c.andi a2, USB_DMASK
+	c.beqz a2, another_interrupt_check
+#endif
 
 	SAVE_DEBUG_MARKER( 48 );
 	DEBUG_TICK_SETUP
@@ -133,7 +140,7 @@ done_preamble:
 	// -5 cycles is too much.
 	// -4 to +6 cycles is OK
 
-	//XXX NOTE: It actuall wouldn't be too bad to inser an *extra* cycle here.
+	//XXX NOTE: It actually wouldn't be too bad to insert an *extra* cycle here.
 
 	/* register meanings:
 		* x4 = TP = used for triggering debug.
@@ -174,7 +181,7 @@ packet_type_loop:
 	// a0 = 00 for 1 and 11 for 0
 
 	// No CRC for the header.
-	//c.srli a0, USB_DM
+	//c.srli a0, USB_PIN_DP
 	//c.addi a0, 1 // 00 -> 1, 11 -> 100
 	//c.andi a0, 1 // If 1, 1 if 0, 0
         c.nop
@@ -208,7 +215,7 @@ packet_type_loop:
 	// we can branch off of bit 2.
 	andi a0, a2, 0x0c
 
-	// if a0 is 1 then it's DATA (full CRC) otheriwse,
+	// if a0 is 1 then it's DATA (full CRC) otherwise,
 	// (0) for setup or PARTIAL CRC.
 	// Careful:  This has to take a constant amount of time either way the branch goes.
 	c.beqz a0, data_crc
@@ -407,6 +414,17 @@ done_usb_message_in:
 	lw	t2, 40(sp)
 	lw  ra, 52(sp)
 
+#if defined (RV003_ADD_EXTI_MASK) && defined (RV003_ADD_EXTI_HANDLER)
+another_interrupt_check:
+	la a5, EXTI_BASE + 20
+	lw a0, 0(a5)
+	andi a0, a0, RV003_ADD_EXTI_MASK
+	c.beqz a0, ret_from_se0
+
+another_interrupt_handler:
+	RV003_ADD_EXTI_HANDLER
+#endif
+
 ret_from_se0:
 	lw	s1, 28(sp)
 	RESTORE_DEBUG_MARKER(48)
@@ -421,9 +439,13 @@ interrupt_complete:
 	c.j 1f; 1: // Extra little bit of delay to make sure we don't accidentally false fire.
 
 	la a5, EXTI_BASE + 20
-	li a0, (1<<USB_DP)
+#ifdef RV003_ADD_EXTI_MASK
+	li a0, (RV003_ADD_EXTI_MASK|(1<<USB_PIN_DM))
+#else
+	li a0, (1<<USB_PIN_DM)
+#endif
 	sw a0, 0(a5)
-
+	
 	// Restore stack.
 	lw	a0, 0(sp)
 	lw	a5, 20(sp)
@@ -537,7 +559,7 @@ handle_se0_keepalive:
 	// Decimate windup - use as HSIrim.
 	neg a1, a1
 	srai a2, a1, 9
-	addi a2, a2, 16  // add hsi offset.
+	addi a2, a2, 16  // add HSI offset.
 
 	// Put trim in place in register.
 	slli a2, a2, 3
@@ -569,20 +591,20 @@ usb_send_data:
 	// ASAP: Turn the bus around and send our preamble + token.
 	c.lw a4, CFGLR_OFFSET(a5)
 
-	li s1, ~((0b1111<<(USB_DM*4)) | (0b1111<<(USB_DP*4)))
+	li s1, ~((0b1111<<(USB_PIN_DP*4)) | (0b1111<<(USB_PIN_DM*4)))
 	and a4, s1, a4
 
 	// Convert D+/D- into 2MHz outputs
-	li s1, ((0b0010<<(USB_DM*4)) | (0b0010<<(USB_DP*4)))
+	li s1, ((0b0010<<(USB_PIN_DP*4)) | (0b0010<<(USB_PIN_DM*4)))
 	or a4, s1, a4
 
-	li s1, (1<<USB_DM) | (1<<(USB_DP+16))
+	li s1, (1<<USB_PIN_DP) | (1<<(USB_PIN_DM+16))
 	c.sw s1, BSHR_OFFSET(a5)
 
 	//00: Universal push-pull output mode
 	c.sw a4, CFGLR_OFFSET(a5)
 
-	li t1, (1<<USB_DM) | (1<<(USB_DP+16)) | (1<<USB_DP) | (1<<(USB_DM+16));
+	li t1, (1<<USB_PIN_DP) | (1<<(USB_PIN_DM+16)) | (1<<USB_PIN_DM) | (1<<(USB_PIN_DP+16));
 
 	SAVE_DEBUG_MARKER( 8 )
 
@@ -677,7 +699,7 @@ done_poly_check2:
 	// s0 is our current "bit" / byte / temp.
 
 	// a0 is our data
-	// a1 is is our length
+	// a1 is our length
 	// a2 our CRC
 	// a3 is TEMPORARY
 	// a4 is used for bit stuffing.
@@ -787,20 +809,20 @@ no_really_done_sending_data:
 	nx6p3delay( 2, a3 );
 
 	// Need to perform an SE0.
-	li s1, (1<<(USB_DP+16)) | (1<<(USB_DM+16))
+	li s1, (1<<(USB_PIN_DM+16)) | (1<<(USB_PIN_DP+16))
 	c.sw s1, BSHR_OFFSET(a5)
 
 	nx6p3delay( 7, a3 );
 
-	li s1, (1<<(USB_DP)) | (1<<(USB_DM+16))
+	li s1, (1<<(USB_PIN_DM)) | (1<<(USB_PIN_DP+16))
 	c.sw s1, BSHR_OFFSET(a5)
 
 	lw s1, CFGLR_OFFSET(a5)
 	// Convert D+/D- into inputs.
-	li a3, ~((0b11<<(USB_DM*4)) | (0b11<<(USB_DP*4)))
+	li a3, ~((0b11<<(USB_PIN_DP*4)) | (0b11<<(USB_PIN_DM*4)))
 	and s1, a3, s1
 	// 01: Floating input mode.
-	li a3, ((0b01<<(USB_DM*4+2)) | (0b01<<(USB_DP*4+2)))
+	li a3, ((0b01<<(USB_PIN_DP*4+2)) | (0b01<<(USB_PIN_DM*4+2)))
 	or s1, a3, s1
 	sw s1, CFGLR_OFFSET(a5)
 
@@ -829,8 +851,8 @@ insert_stuffed_bit:
 
 #ifdef USE_TINY_BOOT
 
-// Absolutey bare-bones hardware initialization for bringing the chip up,
-// setting up the envrionment for C, switching to 48MHz clock, and booting
+// Absolutely bare-bones hardware initialization for bringing the chip up,
+// setting up the environment for C, switching to 48MHz clock, and booting
 // into main... as well as providing EXTI7_0_IRQHandler jump at interrupt
 
 .section .init
@@ -839,16 +861,15 @@ InterruptVector:
 	.align  2
 .option push
 .option norelax
-	la gp, __global_pointer$
-	mv sp, gp //_eusrstack
 #if __GNUC__ > 10
 .option arch, +zicsr
 #endif
+	la sp, _eusrstack  // SP = 0x20000800
 	li a0, 0x80
 	csrw mstatus, a0
-	c.li a0, 3
-	csrw mtvec, a0
-	addi a0, gp, -2048 // will be 0x20000000
+	csrw mtvec, 3
+	addi a0, sp, -2048 // A0 = 0x20000000
+	addi gp, a0, 0x3fc // GP = 0x200003fc
 	c.li a4, 0
 1:	c.sw a4, 0(a0)	// Clear RAM
 	c.addi a0, 4
@@ -856,6 +877,10 @@ InterruptVector:
 2:
 	//XXX WARNING: NO .DATA SECTION IS AVAILABLE HERE!
 	/* SystemInit48HSI */
+
+	// RCC_BASE     = 0x40021000
+	// FLASH_R_BASE = 0x40022000
+	// EXTEND       = 0x40023800
 	la a2, RCC_BASE
 	la a3, FLASH_R_BASE
 	li a1, 0x00000001 | 0x01000000 | 0x80 /* RCC->CTLR RCC_HSION | RCC_PLLON | ((HSITRIM) << 3) */
@@ -885,5 +910,3 @@ always0:
 	.word 0x00
 
 #endif
-
-

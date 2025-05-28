@@ -7,7 +7,15 @@
 
 #if !defined(RV003USB_CUSTOM_C) || RV003USB_CUSTOM_C == 0
 
-#include "ch32v003fun.h"
+#include "ch32fun.h"
+
+#if RV003USB_USB_TERMINAL
+#if FUNCONF_USE_DEBUGPRINTF
+#include "../lib/swio_self.h" // Needed for unlocking DM
+#else 
+#define RV003USB_USB_TERMINAL 0
+#endif
+#endif
 
 #define ENDPOINT0_SIZE 8 //Fixed for USB 1.1, Low Speed.
 
@@ -91,24 +99,30 @@ void usb_setup()
 	}
 #endif
 
-
-	// GPIO D3 for input pin change.
+	// GPIO Setup
 	LOCAL_EXP( GPIO, USB_PORT )->CFGLR = 
 		( LOCAL_EXP( GPIO, USB_PORT )->CFGLR & 
-			(~( ( ( 0xf << (USB_DM*4)) | ( 0xf << (USB_DPU*4)) | ( 0xf << (USB_DP*4)) ) )) )
+			(~( ( ( 0xf << (USB_PIN_DP*4)) | ( 0xf << (USB_PIN_DM*4)) 
+#ifdef USB_PIN_DPU
+				| ( 0xf << (USB_PIN_DPU*4)) 
+#endif
+			) )) )
 		 |
-		(GPIO_Speed_In | GPIO_CNF_IN_PUPD)<<(4*USB_DM) | 
-		(GPIO_Speed_In | GPIO_CNF_IN_PUPD)<<(4*USB_DP) |
-		(GPIO_Speed_50MHz | GPIO_CNF_OUT_PP)<<(4*USB_DPU);
+#ifdef USB_PIN_DPU
+		(GPIO_Speed_50MHz | GPIO_CNF_OUT_PP)<<(4*USB_PIN_DPU) |
+#endif
+		(GPIO_Speed_In | GPIO_CNF_IN_PUPD)<<(4*USB_PIN_DP) | 
+		(GPIO_Speed_In | GPIO_CNF_IN_PUPD)<<(4*USB_PIN_DM);
 
-	int port_id = (((intptr_t)LOCAL_EXP( GPIO, USB_PORT )-(intptr_t)GPIOA)>>10);
-	// Configure the IO as an interrupt.
-	AFIO->EXTICR = (port_id)<<(USB_DP*2); //PORTD.3 (3 out front says PORTD, 3 in back says 3)
-	EXTI->INTENR = 1<<USB_DP; // Enable EXT3
-	EXTI->FTENR = 1<<USB_DP;  // Rising edge trigger
+	// Configure USB_PIN_DM (D-) as an interrupt on falling edge.
+	AFIO->EXTICR = LOCAL_EXP(GPIO_PortSourceGPIO,USB_PORT)<<(USB_PIN_DM*2); // Configure EXTI interrupt for USB_PIN_DM
+	EXTI->INTENR = 1<<USB_PIN_DM; // Enable EXTI interrupt
+	EXTI->FTENR = 1<<USB_PIN_DM;  // Enable falling edge trigger for USB_PIN_DM (D-)
 
-	// This drive pull-up high, which will tell the host that we are going on-bus.
-	LOCAL_EXP( GPIO, USB_PORT )->BSHR = 1<<USB_DPU;
+#ifdef USB_PIN_DPU
+	// This drives USB_PIN_DPU (D- Pull-Up) high, which will tell the host that we are going on-bus.
+	LOCAL_EXP(GPIO,USB_PORT)->BSHR = 1<<USB_PIN_DPU;
+#endif
 
 	// enable interrupt
 	NVIC_EnableIRQ( EXTI7_0_IRQn );
@@ -124,22 +138,49 @@ void usb_pid_handle_in( uint32_t addr, uint8_t * data, uint32_t endp, uint32_t u
 	uint8_t * sendnow;
 	int sendtok = e->toggle_in?0b01001011:0b11000011;
 
+
+
+#if RV003USB_USE_REBOOT_FEATURE_REPORT
+	if( ist->reboot_armed == 2 )
+	{
+		usb_send_empty( sendtok );
+
+		// Initiate boot into bootloader
+		FLASH->BOOT_MODEKEYR = FLASH_KEY1;
+		FLASH->BOOT_MODEKEYR = FLASH_KEY2;
+		FLASH->STATR = 1<<14; // 1<<14 is zero, so, boot bootloader code. Unset for user code.
+		FLASH->CTLR = CR_LOCK_Set;
+		RCC->RSTSCKR |= 0x1000000;
+		PFIC->SCTLR = 1<<31;
+	}
+#endif
+
 #if RV003USB_HANDLE_IN_REQUEST
 	if( e->custom || endp )
 	{
-		// Can re-use data-stack as scratchpad.
+		// Can reuse data-stack as scratchpad.
 		sendnow = __builtin_assume_aligned( data, 4 );
 		usb_handle_user_in_request( e, sendnow, endp, sendtok, ist );
 		return;
 	}
 #endif
 
-	tosend = 0;
-
 	// Handle IN (sending data back to PC)
 	// Do this down here.
 	// We do this because we are required to have an in-endpoint.  We don't
 	// have to do anything with it, though.
+#if RV003USB_USB_TERMINAL
+	if( e->opaque == (uint8_t *)DMDATA0 )
+	{
+		usb_send_data( (void *)DMDATA0, ENDPOINT0_SIZE, 0, sendtok );
+		*DMDATA0 = 0;
+		*DMDATA1 = 0;
+		e->opaque = 0;
+		return;
+	}
+#endif
+
+
 	uint8_t * tsend = e->opaque;
 
 	int offset = (e->count)<<3;
@@ -173,7 +214,7 @@ void usb_pid_handle_data( uint32_t this_token, uint8_t * data, uint32_t which_da
 	length -= 3;
 	uint8_t * data_in = __builtin_assume_aligned( data, 4 );
 
-	// Alrady received this packet.
+	// Already received this packet.
 	if( e->toggle_out != which_data )
 	{
 		goto just_ack;
@@ -181,10 +222,55 @@ void usb_pid_handle_data( uint32_t this_token, uint8_t * data, uint32_t which_da
 
 	e->toggle_out = !e->toggle_out;
 
-#if RV003USB_HANDLE_USER_DATA
+
+#if RV003USB_HANDLE_USER_DATA || RV003USB_USE_REBOOT_FEATURE_REPORT || RV003USB_USB_TERMINAL
 	if( epno || ( !ist->setup_request && length > 3 )  )
 	{
+#if RV003USB_USE_REBOOT_FEATURE_REPORT
+		if( ist->reboot_armed )
+		{
+			uint32_t * base = __builtin_assume_aligned( data_in, 4 );
+			if( epno == 0 && base[0] == 0xaa3412fd && (base[1] & 0x00ffffff) == 0x00ddccbb )
+			{
+				e->count = 7;
+				ist->reboot_armed = 2;
+				goto just_ack;
+			}
+			else
+			{
+				ist->reboot_armed = 0;
+			}
+		}
+#endif
+#if RV003USB_USB_TERMINAL
+		if( epno == 0 && data_in[0] == 0xfd )
+		{
+			uint32_t *base = __builtin_assume_aligned( data_in, 4 );
+
+			*DMDATA0 = base[0];
+			*DMDATA1 = base[1];
+			*DMDATA0 &= ~( 0xFF );
+
+			int i;
+			for( i = 1; i < 8; i++ )
+			{
+				if( data_in[i] == 0 )
+				{
+					*DMDATA0 |= i + 3;
+					break;
+				}
+			}
+
+			goto just_ack;
+		}
+#endif
+
+#if RV003USB_HANDLE_USER_DATA
 		usb_handle_user_data( e, epno, data_in, length, ist );
+#endif
+#if RV003USB_USER_DATA_HANDLES_TOKEN
+		return;
+#endif
 	}
 	else
 #endif
@@ -230,21 +316,54 @@ void usb_pid_handle_data( uint32_t this_token, uint8_t * data, uint32_t which_da
 
 		// We shift down because we don't care if USB_RECIP_INTERFACE is set or not.
 		// Otherwise we have to write extra code to handle each case if it's set or
-		// not set, but in general, there's never a situation where we realy care.
+		// not set, but in general, there's never a situation where we really care.
 		uint32_t reqShl = s->wRequestTypeLSBRequestMSB >> 1;
 
 		//LogUEvent( 0, s->wRequestTypeLSBRequestMSB, wvi, s->wLength );
+
+		if( reqShl == (0x0921>>1) )
+		{
+			// Class request (Will be writing)  This is hid_send_feature_report
+#if RV003USB_USE_REBOOT_FEATURE_REPORT
+			if( wvi == 0x000003fd ) ist->reboot_armed = 1;
+#endif
 #if RV003USB_HID_FEATURES
+			usb_handle_hid_set_report_start( e, wLength, wvi );
+#endif
+		}
+		else
+#if RV003USB_HID_FEATURES || RV003USB_USB_TERMINAL
 		if( reqShl == (0x01a1>>1) )
 		{
 			// Class read request.
 			// The host wants to read back from us. hid_get_feature_report
+#if RV003USB_HID_FEATURES
 			usb_handle_hid_get_report_start( e, wLength, wvi );
-		}
-		else if( reqShl == (0x0921>>1) )
-		{
-			// Class request (Will be writing)  This is hid_send_feature_report
-			usb_handle_hid_set_report_start( e, wLength, wvi );
+#endif
+#if RV003USB_USB_TERMINAL
+			if( ( wvi & 0xff ) == 0xfd )
+			{
+				e->opaque = 0;	// If it's 0xFD feature discard anything that could be set in usb_handle_hid_get_report_start
+				e->max_len = 1; // If 0 - terminal is sent to the stratosphere
+				if( !*DMSTATUS_SENTINEL )
+				{
+					if( ( *DMDATA0 & 0x80 ) )
+					{
+						e->opaque = (uint8_t *)DMDATA0;
+						e->max_len = ( *DMDATA0 & 0xf ) - 4;
+						// e->max_len = 8;
+					}
+					else if( ( *DMDATA0 & 0xc0 ) == 0xc0 )
+					{
+						*DMDATA0 = 0;
+					}
+				}
+				else
+				{
+					attempt_unlock( 2 );
+				}
+			}
+#endif
 		}
 		else
 #endif

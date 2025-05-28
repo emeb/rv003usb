@@ -4,10 +4,10 @@
 //Defines the number of endpoints for this device. (Always add one for EP0). For two EPs, this should be 3.
 #define ENDPOINTS 3
 
-#define USB_DM 3
-#define USB_DP 4
-#define USB_DPU 5
-#define USB_PORT D
+#define USB_PORT D     // [A,C,D] GPIO Port to use with D+, D- and DPU
+#define USB_PIN_DP 3   // [0-4] GPIO Number for USB D+ Pin
+#define USB_PIN_DM 4   // [0-4] GPIO Number for USB D- Pin
+#define USB_PIN_DPU 5  // [0-7] GPIO for feeding the 1.5k Pull-Up on USB D- Pin; Comment out if not used / tied to 3V3!
 
 #define RV003USB_OPTIMIZE_FLASH 1
 #define RV003USB_EVENT_DEBUGGING 0
@@ -41,13 +41,13 @@ static const uint8_t device_descriptor[] = {
 
 static const uint8_t mouse_hid_desc[] = {  //From http://eleccelerator.com/tutorial-about-usb-hid-report-descriptors/
 	HID_USAGE_PAGE( HID_USAGE_PAGE_DESKTOP ),         // USAGE_PAGE (Generic Desktop)
-	HID_USAGE( HID_USAGE_DESKTOP_TABLET_PC_SYSTEM ),  // USAGE (Mouse), Ok actually a tablet but we apply relative motion!
+	HID_USAGE( HID_USAGE_DESKTOP_MOUSE ),  // USAGE (Mouse)
 	HID_COLLECTION ( HID_COLLECTION_APPLICATION ),    // COLLECTION (Application)
 		HID_USAGE( HID_USAGE_DESKTOP_POINTER ),       //   USAGE (Pointer)
 		HID_COLLECTION ( HID_COLLECTION_PHYSICAL ),   //   COLLECTION (Physical)
 			HID_USAGE_PAGE( HID_USAGE_PAGE_BUTTON ),  //     USAGE_PAGE (Button)
 			HID_USAGE_MIN( 1 ),                       //     USAGE_MINIMUM (Button 1)
-			HID_USAGE_MIN( 3 ),                       //     USAGE_MAXIMUM (Button 3)
+			HID_USAGE_MAX( 3 ),                       //     USAGE_MAXIMUM (Button 3)
 			HID_LOGICAL_MIN( 0 ),                     //     LOGICAL_MINIMUM (0)
 			HID_LOGICAL_MAX( 1 ),                     //     LOGICAL_MAXIMUM (1)
 			HID_REPORT_COUNT( 3 ),                    //     REPORT_COUNT (3)
@@ -69,12 +69,14 @@ static const uint8_t mouse_hid_desc[] = {  //From http://eleccelerator.com/tutor
 	HID_COLLECTION_END,                               // END_COLLECTIONs
 
 	// Tack this on to do custom HID commands.
+	/*
 	HID_COLLECTION ( HID_COLLECTION_APPLICATION )                 ,
 		HID_REPORT_ID    ( 0xaa                                   )
 		HID_USAGE        ( 0xff              ) ,
 		HID_FEATURE      ( HID_DATA | HID_ARRAY | HID_ABSOLUTE    ) ,
 		HID_REPORT_COUNT ( 8 ) ,
 	HID_COLLECTION_END,
+	*/
 };
 
 //From http://codeandlife.com/2012/06/18/usb-hid-keyboard-with-v-usb/

@@ -1,8 +1,22 @@
 #ifndef _RV003USB_H
 #define _RV003USB_H
 
+#include "funconfig.h"
 #include "usb_config.h"
 
+// Fallback and issue warning for users with the swapped pin assignments of previous versions
+#if defined(USB_DM) || defined(USB_DP)
+#warning "You usb_config.h is outdated. Please use USB_PIN_DP, USB_PIN_DM and USB_PIN_DPU instead with their respective signal (no swapping!)"
+#define USB_PIN_DM USB_DP
+#define USB_PIN_DP USB_DM
+#endif
+#if defined(USB_DPU)
+#define USB_PIN_DPU USB_DPU
+#endif
+
+#if !defined(FUNCONF_SYSTICK_USE_HCLK) || !FUNCONF_SYSTICK_USE_HCLK
+#error "RV003USB requires #define FUNCONF_SYSTICK_USE_HCLK 1; see funconfig.h"
+#endif
 
 #define LOCAL_CONCAT_BASE(A, B) A##B##_BASE
 #define LOCAL_EXP_BASE(A, B) LOCAL_CONCAT_BASE(A,B)
@@ -22,7 +36,26 @@
 #define RV003USB_EVENT_DEBUGGING     0
 #define RV003USB_DEBUG_TIMING        0
 #define RV003USB_CUSTOM_C            0
+
+#define RV003USB_USE_REBOOT_FEATURE_REPORT 1
+
+#define RV003USB_USER_DATA_HANDLES_TOKEN 0
 */
+
+
+#ifndef RV003USB_USE_REBOOT_FEATURE_REPORT
+#define RV003USB_USE_REBOOT_FEATURE_REPORT 1
+/* Reboot:
+	hid_device * hd = hid_open( 0x1209, 0xd003, 0 );
+	uint8_t bufferX[7] = { 0xfd, 0x12, 0x34, 0xaa, 0xbb, 0xcc, 0xdd };
+	r = hid_send_feature_report( hd, bufferX, sizeof(bufferX) );
+*/
+#endif
+
+#ifndef RV003USB_USB_TERMINAL
+#define RV003USB_USB_TERMINAL 0
+#endif
+
 
 #ifndef __ASSEMBLER__
 
@@ -32,7 +65,7 @@ struct usb_endpoint;
 struct rv003usb_internal;
 struct usb_urb;
 
-// usb_hande_interrupt_in is OBLIGATED to call usb_send_data or usb_send_empty.
+// usb_handle_interrupt_in is OBLIGATED to call usb_send_data or usb_send_empty.
 // Enable with RV003USB_HANDLE_IN_REQUEST=1
 void usb_handle_user_in_request( struct usb_endpoint * e, uint8_t * scratchpad, int endp, uint32_t sendtok, struct rv003usb_internal * ist );
 
@@ -86,7 +119,7 @@ uint32_t * GetUEvent();
 // Packet Type + 8 + CRC + Buffer
 #define USB_BUFFER_SIZE 12
 
-#define USB_DMASK ((1<<(USB_DM)) | 1<<(USB_DP))
+#define USB_DMASK ((1<<(USB_PIN_DP)) | 1<<(USB_PIN_DM))
 
 #ifdef  RV003USB_OPTIMIZE_FLASH
 #define MY_ADDRESS_OFFSET_BYTES 4
@@ -148,7 +181,11 @@ struct rv003usb_internal
 	TURBO8TYPE current_endpoint; // Can this be combined with setup_request?
 	TURBO8TYPE my_address;       // Will be 0 until set up.
 	TURBO8TYPE setup_request;    // 0 for non-setup request, 1 after setup token, is allowed to be 2 for control-out if RV003USB_SUPPORT_CONTROL_OUT is set.
+#if RV003USB_USE_REBOOT_FEATURE_REPORT
+	TURBO8TYPE reboot_armed;     // If in a 0xFD set feature report.
+#else
 	TURBO8TYPE reserved;
+#endif
 	uint32_t last_se0_cyccount;
 	int32_t delta_se0_cyccount;
 	uint32_t se0_windup;
@@ -158,8 +195,8 @@ struct rv003usb_internal
 };
 
 //Detailed analysis of some useful stuff and performance tweaking: http://naberius.de/2015/05/14/esp8266-gpio-output-performance/
-//Reverse engineerd boot room can be helpful, too: http://cholla.mmto.org/esp8266/bootrom/boot.txt
-//USB Protocol read from wikipedia: https://en.wikipedia.org/wiki/USB
+//Reverse engineered boot room can be helpful, too: http://cholla.mmto.org/esp8266/bootrom/boot.txt
+//USB Protocol read from Wikipedia: https://en.wikipedia.org/wiki/USB
 // Neat stuff: http://www.usbmadesimple.co.uk/ums_3.htm
 // Neat stuff: http://www.beyondlogic.org/usbnutshell/usb1.shtml
 
