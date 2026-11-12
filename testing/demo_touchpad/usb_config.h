@@ -9,6 +9,7 @@
 #define USB_PIN_DPU 0
 #define USB_PORT C
 
+#define RV003USB_OPTIMIZE_FLASH    1 // Only disable it if you need to save 16 bytes of RAM or you want to customize usb_pid_handle_ack or usb_pid_handle_setup
 #define RV003USB_DEBUG_TIMING      0
 #define RV003USB_OPTIMIZE_FLASH    0
 #define RV003USB_EVENT_DEBUGGING   0
@@ -106,7 +107,9 @@ static const uint8_t config_descriptor[] = {
 
 #define STR_MANUFACTURER u"CNLohr"
 #define STR_PRODUCT      u"RV003 Touch Stick"
+#ifndef STR_SERIAL
 #define STR_SERIAL       u"CUSTOMDEVICE000"
+#endif
 
 struct usb_string_descriptor_struct {
 	uint8_t bLength;

@@ -153,7 +153,7 @@ SECTIONS
 		PROVIDE( _ebss = .);
 	} >RAM AT>FLASH
 
-	PROVIDE( runwordpad = 0x20000180 ); /* Size >= 1kb */
+	PROVIDE( runwordpad = 0x20000580 ); /* Size >= 1kb */
 	PROVIDE( scratchpad = 0x20000100 );
 
 	PROVIDE( _end = _ebss);

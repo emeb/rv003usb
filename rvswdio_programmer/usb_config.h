@@ -9,6 +9,7 @@
 #define USB_PIN_DM 4   // [0-4] GPIO Number for USB D- Pin
 #define USB_PIN_DPU 5  // [0-7] GPIO for feeding the 1.5k Pull-Up on USB D- Pin; Comment out if not used / tied to 3V3!
 
+#define RV003USB_OPTIMIZE_FLASH    1 // Only disable it if you need to save 16 bytes of RAM or you want to customize usb_pid_handle_ack or usb_pid_handle_setup
 #define RV003USB_DEBUG_TIMING      0
 #define RV003USB_OPTIMIZE_FLASH    1
 #define RV003USB_EVENT_DEBUGGING   0
@@ -47,10 +48,26 @@ static const uint8_t special_hid_desc[] = {
 	HID_USAGE      ( 0x00 ),
 	HID_REPORT_SIZE ( 8 ),
 	HID_COLLECTION ( HID_COLLECTION_LOGICAL ),
+		HID_REPORT_COUNT   ( 7 ),
+		HID_REPORT_ID      ( 0xaa )
+		HID_USAGE          ( 0x01 ),
+		HID_FEATURE        ( HID_DATA | HID_VARIABLE | HID_ABSOLUTE ),
+		HID_REPORT_COUNT   ( 63 ),
+		HID_REPORT_ID      ( 0xab )
+		HID_USAGE          ( 0x01 ),
+		HID_FEATURE        ( HID_DATA | HID_VARIABLE | HID_ABSOLUTE ),
+		HID_REPORT_COUNT   ( 127 ),
+		HID_REPORT_ID      ( 0xac )
+		HID_USAGE          ( 0x01 ),
+		HID_FEATURE        ( HID_DATA | HID_VARIABLE | HID_ABSOLUTE ),
 		HID_REPORT_COUNT   ( 78 ),
 		HID_REPORT_ID      ( 0xad )
 		HID_USAGE          ( 0x01 ),
-		HID_FEATURE        ( HID_DATA | HID_VARIABLE | HID_ABSOLUTE ) ,
+		HID_FEATURE        ( HID_DATA | HID_VARIABLE | HID_ABSOLUTE ),
+    HID_REPORT_COUNT_N ( 263, 2 ),
+		HID_REPORT_ID      ( 0xae )
+		HID_USAGE          ( 0x01 ),
+		HID_FEATURE        ( HID_DATA | HID_VARIABLE | HID_ABSOLUTE ),
 	HID_COLLECTION_END,
 };
 
@@ -97,7 +114,9 @@ static const uint8_t config_descriptor[] = {
 
 #define STR_MANUFACTURER u"CNLohr"
 #define STR_PRODUCT      u"RV003 RVSWDIO Programmer"
+#ifndef STR_SERIAL
 #define STR_SERIAL       u"RVSWDIO003-01"
+#endif
 
 struct usb_string_descriptor_struct {
 	uint8_t bLength;

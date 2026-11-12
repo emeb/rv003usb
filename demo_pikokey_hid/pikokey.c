@@ -8,11 +8,16 @@
 int main()
 {
 	SystemInit();
-	Delay_Ms(1); // Ensures USB re-enumeration after bootloader or reset; Spec demand >2.5µs ( TDDIS )
+	Delay_Ms(100); // Ensures USB re-enumeration after bootloader or reset; Spec demand >2.5µs ( TDDIS )
 	systick_init();
 	GPIO_Init_All();
-    ButtonMatrix_Init(&btn_matrix); // Initialize button matrix state
-    Debounce_Init(&debounce_info); // Initialize debounce info
+
+	// Convert PD1 from SWIO to GPIO
+	AFIO->PCFR1 &= ~(AFIO_PCFR1_SWCFG);
+	AFIO->PCFR1 |= AFIO_PCFR1_SWCFG_DISABLE;
+
+	ButtonMatrix_Init(&btn_matrix); // Initialize button matrix state
+	Debounce_Init(&debounce_info); // Initialize debounce info
 	// printf( "Start\n");
 
 	usb_setup();
@@ -25,11 +30,11 @@ int main()
 			printf( "%lu %lx %lx %lx\n", ue[0], ue[1], ue[2], ue[3] );
 		}
 #endif
-        uint32_t current_time = GetSystemTime();
+		uint32_t current_time = GetSystemTime();
 
-        // Scan the button matrix with debouncing
-        ButtonMatrix_Scan_Debounced(&btn_matrix, &debounce_info, current_time);
-        Delay_Ms(10);
+		// Scan the button matrix with debouncing
+		ButtonMatrix_Scan_Debounced(&btn_matrix, &debounce_info, current_time);
+		Delay_Us(10); // Smaller is better, but too small causes hanging. Increase this delay when key map larger.
 
 	}
 }
@@ -41,15 +46,15 @@ void usb_handle_user_in_request( struct usb_endpoint * e, uint8_t * scratchpad, 
 	if( endp == 1 )
 	{
 		i++;
-		if(keypressed[0] == 1){
+		// if(keypressed[0] == 1){
 			tsajoystick[0] = keypressed[1];
 			for(uint8_t k=0;k<6;k++){
 				tsajoystick[2+k] = keypressed[2+k];
-				keypressed[2+k]=0;
+				// keypressed[2+k]=0;
 			}
-			keypressed[1] = 0;
-			keypressed[0] = 0;
-		}
+			// keypressed[1] = 0;
+			// keypressed[0] = 0;
+		// }
 		usb_send_data( tsajoystick, 8, 0, sendtok );
 		for(uint8_t k=0;k<8;k++){
 			tsajoystick[k] = 0;

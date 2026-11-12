@@ -9,12 +9,12 @@
 #define USB_PIN_DM 4   // [0-4] GPIO Number for USB D- Pin
 // #define USB_PIN_DPU 5  // [0-7] GPIO for feeding the 1.5k Pull-Up on USB D- Pin; Comment out if not used / tied to 3V3!
 
-#define RV003USB_OPTIMIZE_FLASH 1
-#define RV003USB_EVENT_DEBUGGING 0
+#define RV003USB_OPTIMIZE_FLASH    1 // Only disable it if you need to save 16 bytes of RAM or you want to customize usb_pid_handle_ack or usb_pid_handle_setup
+#define RV003USB_EVENT_DEBUGGING   0
 #define RV003USB_HANDLE_IN_REQUEST 1
-#define RV003USB_OTHER_CONTROL 0
-#define RV003USB_HANDLE_USER_DATA 0
-#define RV003USB_HID_FEATURES 0
+#define RV003USB_OTHER_CONTROL     0
+#define RV003USB_HANDLE_USER_DATA  0
+#define RV003USB_HID_FEATURES      0
 
 #ifndef __ASSEMBLER__
 
@@ -87,8 +87,8 @@ static const uint8_t keyboard_hid_desc[] = {   /* USB report descriptor */
 		HID_REPORT_SIZE( 1 ),                         //     REPORT_SIZE (8)
 		HID_REPORT_COUNT( 8 ),                        //     REPORT_COUNT (3)
 		HID_USAGE_PAGE( HID_USAGE_PAGE_KEYBOARD ),    //     USAGE_PAGE (Keyboard)(Key Codes)
-    	HID_USAGE_MIN( 0xe0 ),                        //     USAGE_MINIMUM (Keyboard LeftControl)(224)
-    	HID_USAGE_MAX( 0xe7 ),                        //     USAGE_MAXIMUM (Keyboard Right GUI)(231)
+		HID_USAGE_MIN( 0xe0 ),                        //     USAGE_MINIMUM (Keyboard LeftControl)(224)
+		HID_USAGE_MAX( 0xe7 ),                        //     USAGE_MAXIMUM (Keyboard Right GUI)(231)
 		HID_LOGICAL_MIN( 0 ),                         //     LOGICAL_MINIMUM (0)
 		HID_LOGICAL_MAX( 1 ),                         //     LOGICAL_MAXIMUM (1)
 		HID_INPUT( 0x02 ),                            //     INPUT (Data,Var,Abs) ; Modifier byte
@@ -98,8 +98,8 @@ static const uint8_t keyboard_hid_desc[] = {   /* USB report descriptor */
 		HID_REPORT_COUNT( 5 ),                        //     REPORT_COUNT (5)
 		HID_REPORT_SIZE( 1 ),                         //     REPORT_SIZE (1)
 		HID_USAGE_PAGE( HID_USAGE_PAGE_LED ),         //     USAGE_PAGE (LEDs)
-    	HID_USAGE_MIN( 0x01 ),                        //     USAGE_MINIMUM (Num Lock)
-	    HID_USAGE_MAX( 0x05 ),                        //     USAGE_MAXIMUM (Kana)
+		HID_USAGE_MIN( 0x01 ),                        //     USAGE_MINIMUM (Num Lock)
+		HID_USAGE_MAX( 0x05 ),                        //     USAGE_MAXIMUM (Kana)
 		HID_OUTPUT( 0x02 ),                           //     OUTPUT (Data,Var,Abs) ; LED report
 		HID_REPORT_COUNT( 1 ),                        //     REPORT_COUNT (1)
 		HID_REPORT_SIZE( 3 ),                         //     REPORT_SIZE (3)
@@ -108,11 +108,11 @@ static const uint8_t keyboard_hid_desc[] = {   /* USB report descriptor */
 		HID_REPORT_SIZE( 8 ),                         //     REPORT_SIZE (8)
 		HID_LOGICAL_MIN( 0 ),                         //     LOGICAL_MINIMUM (0)
 		HID_LOGICAL_MAX( 167 ),                       //     LOGICAL_MAXIMUM (167)  (Normally would be 101, but we want volume buttons)
-    	HID_USAGE_PAGE( HID_USAGE_PAGE_KEYBOARD ),     //     USAGE_PAGE (Keyboard)(Key Codes)
-    	HID_USAGE_MIN( 0x00 ),                        //     USAGE_MINIMUM (0)
-	    HID_USAGE_MAX( 167 ),                         //     USAGE_MAXIMUM (Keyboard Application)(101) (Now 167)
+		HID_USAGE_PAGE( HID_USAGE_PAGE_KEYBOARD ),     //     USAGE_PAGE (Keyboard)(Key Codes)
+		HID_USAGE_MIN( 0x00 ),                        //     USAGE_MINIMUM (0)
+		HID_USAGE_MAX( 167 ),                         //     USAGE_MAXIMUM (Keyboard Application)(101) (Now 167)
 	HID_INPUT( 0 ),                                   //   INPUT (Data,Ary,Abs)
-    HID_COLLECTION_END,                               // END_COLLECTION
+	HID_COLLECTION_END,                               // END_COLLECTION
 };
 
 //Ever wonder how you have more than 6 keys down at the same time on a USB keyboard?  It's easy. Enumerate two keyboards!
@@ -188,7 +188,9 @@ static const uint8_t config_descriptor[] = {  //Mostly stolen from a USB mouse I
 
 #define STR_MANUFACTURER u"Prokyber"
 #define STR_PRODUCT      u"PikoKey"
+#ifndef STR_SERIAL
 #define STR_SERIAL       u"000"
+#endif
 
 struct usb_string_descriptor_struct {
 	uint8_t bLength;

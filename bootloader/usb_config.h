@@ -19,7 +19,7 @@
 #define USB_PORT D     // [A,C,D] GPIO Port to use with D+, D- and DPU
 #define USB_PIN_DP 3   // [0-4] GPIO Number for USB D+ Pin
 #define USB_PIN_DM 4   // [0-4] GPIO Number for USB D- Pin
-//#define USB_PORT_DPU A  // [A,C,D] Override GPIO Port for DPU
+//#define USB_DPU_PORT A  // [A,C,D] Override GPIO Port for DPU
 #define USB_PIN_DPU 5  // [0-7] GPIO for feeding the 1.5k Pull-Up on USB D- Pin; Comment out if not used / tied to 3V3!
 
 #define RV003USB_OPTIMIZE_FLASH 1
@@ -33,14 +33,14 @@
 static const uint8_t device_descriptor[] = {
 	18, //Length
 	1,  //Type (Device)
-	0x10, 0x01, //Spec
+	0x00, 0x02, //Spec (bcdUSB)
 	0x0, //Device Class
 	0x0, //Device Subclass
 	0x0, //Device Protocol  (000 = use config descriptor)
 	0x08, //Max packet size for EP0 (This has to be 8 because of the USB Low-Speed Standard)
 	0x09, 0x12, //ID Vendor   //TODO: register this in http://pid.codes/howto/ or somewhere.
 	0x03, 0xb0, //ID Product
-	0x02, 0x00, //ID Rev
+	0x00, 0x00, //ID Rev (bcdDevice)
 	1, //Manufacturer string
 	2, //Product string
 	3, //Serial string
@@ -49,14 +49,22 @@ static const uint8_t device_descriptor[] = {
 
 
 static const uint8_t special_hid_desc[] = { 
-  HID_USAGE_PAGE ( HID_USAGE_PAGE_DESKTOP      )                 ,
-  HID_USAGE      ( 0xff  )                 , // Needed?
-  HID_COLLECTION ( HID_COLLECTION_APPLICATION )                 ,
-    HID_REPORT_SIZE ( 8 ),
-    HID_REPORT_COUNT ( 127 ) ,
-    HID_REPORT_ID    ( 0xaa                                   )
-    HID_USAGE        ( 0xff              ) ,
-    HID_FEATURE      ( HID_DATA | HID_ARRAY | HID_ABSOLUTE    ) ,
+  HID_USAGE_PAGE ( HID_USAGE_PAGE_DESKTOP ),
+  HID_USAGE      ( 0xff ), // Needed?
+  HID_REPORT_SIZE ( 8 ),
+  HID_COLLECTION ( HID_COLLECTION_APPLICATION ),
+    HID_REPORT_COUNT ( 7 ),
+    HID_REPORT_ID    ( 0xa8 )
+    HID_USAGE        ( 0xff ),
+    HID_FEATURE      ( HID_DATA | HID_ARRAY | HID_ABSOLUTE ),
+    HID_REPORT_COUNT ( 127 ),
+    HID_REPORT_ID    ( 0xaa )
+    HID_USAGE        ( 0xff ),
+    HID_FEATURE      ( HID_DATA | HID_ARRAY | HID_ABSOLUTE ),
+    HID_REPORT_COUNT_N ( 1024+127, 2 ),
+    HID_REPORT_ID    ( 0xab )
+    HID_USAGE        ( 0xff ),
+    HID_FEATURE      ( HID_DATA | HID_ARRAY | HID_ABSOLUTE ),
   HID_COLLECTION_END
 };
 
@@ -108,7 +116,9 @@ static const uint8_t config_descriptor[] = {  //Mostly stolen from a USB mouse I
 
 #define STR_MANUFACTURER u"cnlohr"
 #define STR_PRODUCT      u"rv003usb"
+#ifndef STR_SERIAL
 #define STR_SERIAL       u"NBTT" // Need to change to BOOT when we finally decide on a flashing mechanism.
+#endif
 
 struct usb_string_descriptor_struct {
 	uint8_t bLength;
