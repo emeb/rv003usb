@@ -4,9 +4,9 @@
 //Defines the number of endpoints for this device. (Always add one for EP0). For two EPs, this should be 3.
 #define ENDPOINTS 2
 
-#define USB_DM 4	// swapped for bubble board
-#define USB_DP 3
-#define USB_DPU 5
+#define USB_PIN_DM 4	// swapped for bubble board
+#define USB_PIN_DP 3
+#define USB_PIN_DPU 5
 #define USB_PORT D
 
 #define RV003USB_DEBUG_TIMING      0
